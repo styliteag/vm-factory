@@ -35,5 +35,9 @@ rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
 rm -f /var/lib/dhcp/* 2>/dev/null || true
 rm -f /root/.bash_history /home/*/.bash_history 2>/dev/null || true
 
+echo "==> Packer-User entfernen"
+userdel -r packer || true
+rm -f /etc/sudoers.d/90-packer
+
 sync
 echo "==> 99-cleanup.sh fertig"

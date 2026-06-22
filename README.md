@@ -17,18 +17,16 @@ Hostname/IP werden anschließend nach Bedarf (z. B. per Ansible) gesetzt.
 ## Funktionsweise
 
 ```
-            ┌────────────────────┐         API          ┌─────────────────────┐
+            ┌────────────────────┐         API          ┌──────────────────────┐
             │  Build-Host        │ ───────────────────▶ │  Proxmox VE          │
-            │  (Debian/Ubuntu)   │   proxmox-iso        │                      │
+            │    (This host)     │   proxmox-iso        │                      │
             │  + Packer          │                      │  1. lädt ISO selbst  │
             │  + HTTP-Server ◀───┼── autoinstall/preseed│  2. VM aus ISO       │
             └────────────────────┘   (http/ wird vom    │  3. Provisionierung  │
-                                      Gast geladen)      │  4. → Template       │
-                                                         └─────────────────────┘
+                                      Gast geladen)     │  4. → Template       │
+                                                        └──────────────────────┘
 ```
 
-- Der **Build-Host** ist *nicht* der Proxmox-Server, sondern eine separate
-  Maschine (oder VM), die per API mit Proxmox spricht.
 - Proxmox lädt das Installations-ISO **selbst** herunter (`iso_download_pve`).
 - Die Installation läuft vollautomatisch via **autoinstall** (Ubuntu) bzw.
   **preseed** (Debian); die Antwortdateien werden vom kurzlebigen
@@ -44,7 +42,7 @@ Hostname/IP werden anschließend nach Bedarf (z. B. per Ansible) gesetzt.
 
 | Was | Wozu |
 |-----|------|
-| Debian/Ubuntu Linux | Betriebssystem für den Build-Host |
+| Debian/Ubuntu Linux oder MacOS | Betriebssystem für den Build-Host |
 | **Packer ≥ 1.11** | wird per `install-packer.sh` installiert |
 | `git`, `curl` | Repo & Hilfsskripte |
 | **Netzwerk** | muss Proxmox auf Port **8006** erreichen **und** vom VM-Netz aus erreichbar sein (für den HTTP-Server) |
@@ -126,11 +124,16 @@ git clone git@github.com:styliteag/vm-factory.git
 cd vm-factory
 ```
 
-### 2. Packer installieren
+### 2. Packer installieren (Linux/MacOS)
 
 ```bash
+# Linux
 sudo ./install-packer.sh        # offizielles HashiCorp-APT-Repo
 packer version
+
+# MacOS
+brew tap hashicorp/tap
+brew install hashicorp/tap/packer
 ```
 
 ### 3. Proxmox-API-Token anlegen
@@ -148,6 +151,8 @@ Sys.Audit Sys.Console Sys.Modify SDN.Use"
 pveum user add packer@pve
 pveum aclmod / -user packer@pve -role Packer
 pveum user token add packer@pve packer --privsep 0   # Token erbt User-Rechte
+
+# Oder einfach einen API-Token anlegen und alle Rechte vergeben in der Proxmox-UI.
 ```
 
 Das ausgegebene **Token-Secret** notieren (wird nur einmal angezeigt).
@@ -207,7 +212,9 @@ ssh root@<IP-des-Klons>
 ```
 
 Hostname und ggf. statische IP werden anschließend gesetzt (manuell oder per
-Ansible). Platte vergrößern: `qm disk resize 9001 scsi0 40G`, danach im Gast
+Ansible). 
+
+Platte vergrößern: `qm disk resize 9001 scsi0 40G`, danach im Gast
 `growpart /dev/sda 1 && resize2fs ...` (kein automatisches Wachsen ohne Cloud-Init).
 
 ---
@@ -237,19 +244,6 @@ Ansible). Platte vergrößern: `qm disk resize 9001 scsi0 40G`, danach im Gast
 
 > Ist `ssh_authorized_keys` leer, bleibt der Passwort-Login aktiv (sonst wäre der
 > Klon ohne hinterlegten Schlüssel nicht erreichbar).
-
-### Build-User
-
-`autoinstall`/`preseed` legen den User **`packer`** (passwortloses sudo) für die
-Provisionierung an. Mit gesetztem `ssh_authorized_keys` ist der Passwort-Login
-deaktiviert – `packer` kann sich dann **nicht** mehr per SSH anmelden (nur dein
-root-Key). Soll das Template den User gar nicht behalten, am Ende von
-`scripts/99-cleanup.sh` ergänzen:
-
-```bash
-userdel -r packer || true
-rm -f /etc/sudoers.d/90-packer
-```
 
 ---
 
