@@ -297,6 +297,38 @@ WantedBy=multi-user.target
 EOF
 systemctl enable regenerate-ssh-host-keys.service >/dev/null 2>&1 || true
 
+echo "==> Packer-Build-User beim ersten Boot entfernen (im Build unmoeglich)"
+# userdel scheitert waehrend des Builds an der aktiven packer-Login-Session
+# ("user packer is currently used by process ..."). Daher verschoben auf den
+# ersten Boot des Klons -- dort ist niemand als packer angemeldet.
+cat > /usr/local/sbin/remove-packer-user.sh <<'EOF'
+#!/bin/sh
+# Entfernt den Build-User 'packer' einmalig beim ersten Boot und loescht sich
+# danach selbst (Service-Unit + dieses Skript).
+set -eu
+if id packer >/dev/null 2>&1; then
+  pkill -KILL -u packer 2>/dev/null || true
+  userdel -r packer 2>/dev/null || true
+fi
+rm -f /etc/sudoers.d/90-packer
+systemctl disable remove-packer-user.service >/dev/null 2>&1 || true
+rm -f /etc/systemd/system/remove-packer-user.service /usr/local/sbin/remove-packer-user.sh
+EOF
+chmod 0755 /usr/local/sbin/remove-packer-user.sh
+cat > /etc/systemd/system/remove-packer-user.service <<'EOF'
+[Unit]
+Description=Remove the Packer build user on first boot (once)
+ConditionPathExists=/usr/local/sbin/remove-packer-user.sh
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/remove-packer-user.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable remove-packer-user.service >/dev/null 2>&1 || true
+
 echo "==> Root-SSH-Key(s) + SSH-Haertung"
 install -d -m 0700 /root/.ssh
 mkdir -p /etc/ssh/sshd_config.d

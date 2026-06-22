@@ -35,8 +35,9 @@ rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
 rm -f /var/lib/dhcp/* 2>/dev/null || true
 rm -f /root/.bash_history /home/*/.bash_history 2>/dev/null || true
 
-echo "==> Packer-User entfernen"
-userdel -r packer || true
+echo "==> Packer-User: sudo-Rechte entziehen (Account-Loeschung erfolgt beim ersten"
+echo "    Boot via remove-packer-user.service -- userdel scheitert hier an der"
+echo "    aktiven packer-Login-Session)"
 rm -f /etc/sudoers.d/90-packer
 
 sync

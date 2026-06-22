@@ -65,6 +65,12 @@ Versionierung nach [SemVer](https://semver.org/lang/de/).
 - **README-Doku zur Platten-Vergrößerung korrigiert:** Root wächst beim Boot
   automatisch (`growroot.service`), nicht erst nach manuellem `growpart`/`resize2fs`
   (veralteter Cloud-Init-Hinweis entfernt).
+- **Packer-Build-User wurde nie aus dem Template entfernt:** `userdel -r packer`
+  in `99-cleanup.sh` scheiterte an der aktiven Build-Login-Session
+  (`user packer is currently used by process …`) und wurde per `|| true`
+  verschluckt → Golden Image enthielt den Build-User samt `/home/packer`. Löschung
+  jetzt auf den ersten Klon-Boot verschoben (`remove-packer-user.service`,
+  self-removing Oneshot); `99-cleanup.sh` entzieht nur noch die sudo-Rechte.
 
 ## [0.1.0] - 2026-06-21
 
