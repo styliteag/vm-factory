@@ -1,5 +1,18 @@
 # vm-factory
 
+> **TL;DR** – Mit [Packer](https://developer.hashicorp.com/packer) gebaute **VM-Templates ("Golden Images")**
+> für **Ubuntu 26.04** & **Debian 13** auf **Proxmox** und **VMware vSphere** – **ohne Cloud-Init**.
+> Vollautomatische Installation (autoinstall/preseed), Gast-Tools (`qemu-guest-agent`/`open-vm-tools`)
+> und **root-SSH-Key** sind fertig eingebacken. Ergebnis: klonen → starten → per DHCP auf `eth0`
+> direkt als `root` per SSH erreichbar; Hostname/IP danach nach Bedarf (z. B. Ansible).
+>
+> ```bash
+> ./install-packer.sh                       # Packer installieren
+> cp credentials.pkrvars.hcl.example credentials.pkrvars.hcl   # Zugang eintragen
+> ./build.sh validate                       # Konfig prüfen
+> ./build.sh ubuntu-26.04                   # Template bauen (Default: Proxmox)
+> ```
+
 Baut generalisierte **VM-Templates ("Golden Images")** für **Ubuntu 26.04 LTS**
 und **Debian 13 (Trixie)** auf **Proxmox VE** und **VMware vSphere** – im Stil von
 [chef/bento](https://github.com/chef/bento), aber nativ mit den `proxmox-iso`- und
