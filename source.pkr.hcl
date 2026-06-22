@@ -83,6 +83,9 @@ source "proxmox-iso" "vm" {
   boot_wait      = var.boot_wait
   boot_command   = var.boot_command
   http_directory = "http"
+  # Bei mehreren NICs die IP setzen, die der Gast erreichen soll (leer = Packer
+  # waehlt automatisch). Bindet den HTTP-Server an diese lokale IP -> {{ .HTTPIP }}.
+  http_bind_address = var.http_ip != "" ? var.http_ip : null
 
   # ---- SSH (Provisionierung nach Installation) ----
   ssh_username = var.ssh_username

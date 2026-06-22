@@ -63,6 +63,11 @@ Hostname/IP werden anschließend nach Bedarf (z. B. per Ansible) gesetzt.
 | Storage für `iso` | Datastore mit „ISO image"-Content (z. B. `local`) |
 | Bridge mit DHCP | das VM-Netz braucht während der Installation DHCP |
 
+> **Pre-flight Proxmox:** Der Build-Host muss vom VM-Netz aus erreichbar sein
+> (HTTP-Server für autoinstall/preseed). Bei einer einzelnen NIC wählt Packer die
+> IP automatisch; bei **mehreren NICs** die richtige IP per `http_ip` in
+> `credentials.pkrvars.hcl` setzen (bindet den HTTP-Server an diese IP).
+
 ### VMware vSphere (optional, für `./build.sh vsphere ...`)
 
 | Was | Details |
