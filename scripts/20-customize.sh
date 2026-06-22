@@ -52,11 +52,15 @@ if [ -d /etc/update-motd.d ]; then
 #!/bin/sh
 echo
 echo "Dieses System wurde mit Packer bei der Stylite AG erstellt."
+echo "Erstkonfiguration (Hostname, feste IP, Platten): siehe /root/SETUP.md"
 echo
 EOF
   chmod 0755 /etc/update-motd.d/99-stylite
 else
-  echo "Dieses System wurde mit Packer bei der Stylite AG erstellt." > /etc/motd
+  {
+    echo "Dieses System wurde mit Packer bei der Stylite AG erstellt."
+    echo "Erstkonfiguration (Hostname, feste IP, Platten): siehe /root/SETUP.md"
+  } > /etc/motd
 fi
 
 echo "==> Interface-Benennung auf eth0 (net.ifnames=0 biosdevname=0)"
@@ -87,6 +91,23 @@ network:
       dhcp6: false
       accept-ra: false
       dhcp-identifier: mac
+# --- Feste IP? dhcp4 auf false setzen und folgende Zeilen einkommentieren ---
+# --- (Werte anpassen; ausfuehrliches Rezept: /root/SETUP.md) ----------------
+#     dhcp4: false
+#     addresses: [10.0.0.10/24]
+#     routes:
+#       - to: default
+#         via: 10.0.0.1
+#     nameservers:
+#       addresses: [10.0.0.1, 1.1.1.1]
+# danach:  netplan apply
+#
+# --- Zweite NIC (eth1)? unter "ethernets:" (gleiche Einrueckung wie eth0) ---
+#     eth1:
+#       dhcp4: true
+#       # oder feste IP analog zu eth0 oben:
+#       # dhcp4: false
+#       # addresses: [10.0.1.10/24]
 EOF
     chmod 0600 /etc/netplan/00-eth0.yaml
     ;;
@@ -101,9 +122,99 @@ iface lo inet loopback
 
 allow-hotplug eth0
 iface eth0 inet dhcp
+
+# --- Feste IP? Die zwei eth0-Zeilen oben durch folgendes ersetzen ---
+# --- (Werte anpassen; ausfuehrliches Rezept: /root/SETUP.md) --------
+# auto eth0
+# iface eth0 inet static
+#     address 10.0.0.10/24
+#     gateway 10.0.0.1
+#     dns-nameservers 10.0.0.1 1.1.1.1
+# danach:  systemctl restart networking   (oder reboot)
+#
+# --- Zweite NIC (eth1)? folgende Zeilen einkommentieren ---
+# allow-hotplug eth1
+# iface eth1 inet dhcp
+# # oder feste IP:
+# # iface eth1 inet static
+# #     address 10.0.1.10/24
 EOF
     ;;
 esac
+
+echo "==> Erstkonfigurations-Hilfen ablegen (passiv, nichts laeuft automatisch)"
+# Zentrale Anleitung fuer den Installer/Operator nach dem Klonen.
+cat > /root/SETUP.md <<'EOF'
+# Erstkonfiguration nach dem Klonen
+
+Dieses Image ist ein Golden Template **ohne** Cloud-Init. Hostname, feste IP und
+zusätzliche Platten werden bewusst NICHT automatisch gesetzt — hier die Rezepte.
+(Auskommentierte Kurzvorlagen stehen zusätzlich direkt in den jeweiligen
+Konfigdateien.)
+
+## Hostname setzen
+    hostnamectl set-hostname my-name
+    # /etc/hosts mitziehen (Zeile anlegen oder ersetzen):
+    sed -i 's/^127\.0\.1\.1.*/127.0.1.1\tmy-name/' /etc/hosts
+
+## Feste IP
+
+### Ubuntu (netplan) — /etc/netplan/00-eth0.yaml
+DHCP-Block ersetzen, dann `netplan apply`:
+    network:
+      version: 2
+      renderer: networkd
+      ethernets:
+        eth0:
+          dhcp4: false
+          addresses: [10.0.0.10/24]
+          routes:
+            - to: default
+              via: 10.0.0.1
+          nameservers:
+            addresses: [10.0.0.1, 1.1.1.1]
+
+### Debian (ifupdown) — /etc/network/interfaces
+eth0-Block ersetzen, dann `systemctl restart networking`:
+    auto eth0
+    iface eth0 inet static
+        address 10.0.0.10/24
+        gateway 10.0.0.1
+        dns-nameservers 10.0.0.1 1.1.1.1
+
+### Zweite NIC (eth1)
+Zweites Interface in Proxmox/vSphere hinzufügen, dann (auskommentierte Vorlage
+steht schon in der jeweiligen Configdatei):
+
+Ubuntu — unter `ethernets:` in `00-eth0.yaml`:
+    eth1:
+      dhcp4: true            # oder feste IP wie bei eth0
+
+Debian — in `/etc/network/interfaces`:
+    allow-hotplug eth1
+    iface eth1 inet dhcp     # oder  inet static  mit address/...
+
+## Zweite Platte einbinden (z. B. /dev/sdb -> /data)
+ACHTUNG: `mkfs` löscht die Platte. Erst mit `lsblk` das richtige Gerät prüfen!
+    lsblk                       # richtige Platte finden
+    mkfs.ext4 /dev/sdb
+    mkdir -p /data
+    blkid /dev/sdb              # UUID ablesen
+    # Zeile in /etc/fstab eintragen (nofail: fehlende Platte haengt den Boot nicht):
+    echo "UUID=<UUID-AUS-BLKID> /data ext4 defaults,nofail 0 2" >> /etc/fstab
+    mount -a                    # testen, dass fstab stimmt
+EOF
+chmod 0644 /root/SETUP.md
+
+# Kurz-Stub direkt in der fstab (passiv, auskommentiert).
+cat >> /etc/fstab <<'EOF'
+
+# --- Zweite Platte einbinden? Rezept: /root/SETUP.md --------------------
+# ACHTUNG: mkfs loescht Daten -- Geraet zuerst mit  lsblk  pruefen!
+#   mkfs.ext4 /dev/sdb && mkdir -p /data && blkid /dev/sdb
+# dann hier eintragen (UUID aus blkid einsetzen):
+# UUID=<UUID>  /data  ext4  defaults,nofail  0  2
+EOF
 
 echo "==> Auto-Resize der Root-Partition beim ersten Boot einrichten"
 cat > /usr/local/sbin/growroot.sh <<'EOF'

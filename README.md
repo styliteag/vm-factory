@@ -212,7 +212,10 @@ ssh root@<IP-des-Klons>
 ```
 
 Hostname und ggf. statische IP werden anschließend gesetzt (manuell oder per
-Ansible). 
+Ansible). Im Klon liegt `/root/SETUP.md` mit fertigen Rezepten (Hostname, feste
+IP für netplan/ifupdown, zweite Platte); die MOTD verweist beim Login darauf.
+Auskommentierte Kurzvorlagen stehen zusätzlich direkt in `00-eth0.yaml` /
+`/etc/network/interfaces` und `/etc/fstab`.
 
 Platte vergrößern: `qm disk resize 9001 scsi0 40G` und neu starten. Die
 Root-Partition wächst beim Boot automatisch auf die volle Plattengröße
