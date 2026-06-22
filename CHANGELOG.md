@@ -18,8 +18,11 @@ Versionierung nach [SemVer](https://semver.org/lang/de/).
 - **Erstkonfigurations-Hilfen** für den Klon (passiv, Golden Image bleibt sauber):
   zentrale `/root/SETUP.md` mit Rezepten (Hostname inkl. `/etc/hosts`, feste IP für
   netplan/ifupdown, zweite NIC `eth1`, zweite Platte via `lsblk`/`mkfs`/`blkid`/`fstab`
-  mit `nofail`), MOTD-Zeiger darauf sowie auskommentierte Kurzvorlagen direkt in
-  `00-eth0.yaml` / `/etc/network/interfaces` und `/etc/fstab`.
+  mit `nofail`, Root-Platte vergrößern, Sanity-Check nach dem Klonen), MOTD-Zeiger
+  darauf sowie auskommentierte Kurzvorlagen direkt in `00-eth0.yaml` /
+  `/etc/network/interfaces` und `/etc/fstab`.
+- **Konsolen-Login zeigt die aktuelle IP** (`/etc/issue` mit agetty-Escape
+  `\4{eth0}`) — DHCP-IP headless ohne Hypervisor-Konsole ablesbar.
 
 ### Geändert
 

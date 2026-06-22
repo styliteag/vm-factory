@@ -64,6 +64,15 @@ else
   } > /etc/motd
 fi
 
+echo "==> Konsolen-Login: aktuelle IP am Prompt anzeigen (/etc/issue)"
+# agetty-Escapes: \S=OS, \n=Hostname, \l=tty, \4{eth0}=IPv4 von eth0.
+# Hilft headless, die per DHCP vergebene IP ohne Hypervisor-Konsole zu sehen.
+cat > /etc/issue <<'EOF'
+\S \r -- \n (\l)
+eth0 IPv4: \4{eth0}
+
+EOF
+
 echo "==> Interface-Benennung auf eth0 (net.ifnames=0 biosdevname=0)"
 if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub; then
   grep -q 'net.ifnames=0' /etc/default/grub \
@@ -204,6 +213,20 @@ ACHTUNG: `mkfs` löscht die Platte. Erst mit `lsblk` das richtige Gerät prüfen
     # Zeile in /etc/fstab eintragen (nofail: fehlende Platte haengt den Boot nicht):
     echo "UUID=<UUID-AUS-BLKID> /data ext4 defaults,nofail 0 2" >> /etc/fstab
     mount -a                    # testen, dass fstab stimmt
+
+## Root-Platte vergrößern
+Platte am Host vergrößern (Beispiel Proxmox):
+    qm disk resize <VMID> scsi0 40G
+Dann die VM neu starten — die Root-Partition wächst beim Boot automatisch
+(`growroot.service`, einmalig). Kein manuelles `growpart`/`resize2fs` nötig.
+Prüfen:  `df -h /`
+
+## Sanity-Check nach dem Klonen
+    hostnamectl                            # Hostname korrekt gesetzt?
+    cat /etc/machine-id                    # nicht leer, pro Klon eindeutig
+    ip a                                   # IP auf eth0 vorhanden?
+    systemctl is-active qemu-guest-agent   # bzw. open-vm-tools (vSphere)
+    df -h /                                # Root auf voller Plattengröße?
 EOF
 chmod 0644 /root/SETUP.md
 
