@@ -1,0 +1,9 @@
+# Einheitliche Zeilenenden -- wichtig fuer Shell-Skripte und HCL
+* text=auto eol=lf
+
+*.sh      text eol=lf
+*.hcl     text eol=lf
+*.cfg     text eol=lf
+user-data text eol=lf
+meta-data text eol=lf
+*.md      text eol=lf

@@ -1,0 +1,16 @@
+# Umgebungsspezifische Zugangsdaten -- niemals einchecken!
+credentials*.pkrvars.hcl
+*.auto.pkrvars.hcl
+
+# Packer-Laufzeit
+.packer.d/
+packer_cache/
+crash.log
+*.log
+
+# Editor
+*.swp
+.DS_Store
+
+# Claude Code (lokale Einstellungen)
+.claude/settings.local.json

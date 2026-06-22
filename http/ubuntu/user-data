@@ -1,0 +1,43 @@
+#cloud-config
+# Ubuntu autoinstall (subiquity) -- siehe
+# https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+autoinstall:
+  version: 1
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  refresh-installer:
+    update: false
+
+  # Einzelne grosse Root-Partition -> laesst sich beim Klonen leicht vergroessern
+  storage:
+    layout:
+      name: direct
+
+  identity:
+    hostname: ubuntu
+    username: packer
+    # Passwort: "packer" (SHA-512). Fuer die Provisionierung durch Packer.
+    password: '$6$SvWctbBL$FUUL/iiycCgbrr6EU18dfvkOrL6U8asjgxYatgpZNfFG7WT0axUd4O9GstdI8ZjrUUngKJUtwsdJhKYEhHVn0/'
+
+  ssh:
+    install-server: true
+    allow-pw: true
+
+  packages:
+    - qemu-guest-agent
+    - open-vm-tools
+    - sudo
+
+  user-data:
+    disable_root: false
+
+  early-commands:
+    # Verhindert, dass Packer sich bereits zum Installer verbindet
+    - systemctl stop ssh.service || true
+    - systemctl stop ssh.socket || true
+
+  late-commands:
+    - echo 'packer ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/90-packer
+    - chmod 0440 /target/etc/sudoers.d/90-packer
+    - curtin in-target --target=/target -- systemctl enable qemu-guest-agent
