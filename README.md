@@ -214,8 +214,11 @@ ssh root@<IP-des-Klons>
 Hostname und ggf. statische IP werden anschließend gesetzt (manuell oder per
 Ansible). 
 
-Platte vergrößern: `qm disk resize 9001 scsi0 40G`, danach im Gast
-`growpart /dev/sda 1 && resize2fs ...` (kein automatisches Wachsen ohne Cloud-Init).
+Platte vergrößern: `qm disk resize 9001 scsi0 40G` und neu starten. Die
+Root-Partition wächst beim Boot automatisch auf die volle Plattengröße
+(`growroot.service`, einmaliger systemd-Oneshot aus `scripts/20-customize.sh`).
+Funktioniert für Ubuntu (Plain-Partition) **und** Debian (LVM) — kein manuelles
+`growpart`/`resize2fs` mehr nötig.
 
 ---
 
