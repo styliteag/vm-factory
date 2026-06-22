@@ -15,6 +15,11 @@ Versionierung nach [SemVer](https://semver.org/lang/de/).
 - `build.sh` mit Plattform-Auswahl (`./build.sh [proxmox|vsphere] ...`, `-only` + `-force`).
 - vSphere-Variablen + `credentials-vsphere.pkrvars.hcl.example`; Ubuntu nutzt den
   bewährten Fork-`boot_command` (GRUB-`c`/casper) via `vsphere_boot_command`.
+- **Erstkonfigurations-Hilfen** für den Klon (passiv, Golden Image bleibt sauber):
+  zentrale `/root/SETUP.md` mit Rezepten (Hostname inkl. `/etc/hosts`, feste IP für
+  netplan/ifupdown, zweite NIC `eth1`, zweite Platte via `lsblk`/`mkfs`/`blkid`/`fstab`
+  mit `nofail`), MOTD-Zeiger darauf sowie auskommentierte Kurzvorlagen direkt in
+  `00-eth0.yaml` / `/etc/network/interfaces` und `/etc/fstab`.
 
 ### Geändert
 
@@ -54,6 +59,9 @@ Versionierung nach [SemVer](https://semver.org/lang/de/).
 - `sudo -E` aus `execute_command` entfernt (von der Policy ignoriert);
   Env-Variablen werden nun via `sudo env` zuverlässig übergeben.
 - Harmlose `systemctl enable`-Warnung für qemu-guest-agent auf Debian unterdrückt.
+- **README-Doku zur Platten-Vergrößerung korrigiert:** Root wächst beim Boot
+  automatisch (`growroot.service`), nicht erst nach manuellem `growpart`/`resize2fs`
+  (veralteter Cloud-Init-Hinweis entfernt).
 
 ## [0.1.0] - 2026-06-21
 
