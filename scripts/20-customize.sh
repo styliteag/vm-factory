@@ -20,6 +20,7 @@ export DEBIAN_FRONTEND=noninteractive
 : "${SSH_AUTHORIZED_KEYS:=}"
 : "${ROOT_PASSWORD:=}"
 
+# shellcheck source=/dev/null
 . /etc/os-release
 
 echo "==> Pakete fuer Locale/Tastatur/Resize sicherstellen"
