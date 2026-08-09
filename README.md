@@ -232,9 +232,11 @@ Auskommentierte Kurzvorlagen stehen zusätzlich direkt in `00-eth0.yaml` /
 
 Platte vergrößern: `qm disk resize 9001 scsi0 40G` und neu starten. Die
 Root-Partition wächst beim Boot automatisch auf die volle Plattengröße
-(`growroot.service`, einmaliger systemd-Oneshot aus `scripts/20-customize.sh`).
-Funktioniert für Ubuntu (Plain-Partition) **und** Debian (LVM) — kein manuelles
-`growpart`/`resize2fs` mehr nötig.
+(`growroot.service` aus `scripts/20-customize.sh`). Der Dienst läuft bei **jedem**
+Boot und ist idempotent — die Reihenfolge Vergrößern/Booten spielt also keine
+Rolle. Funktioniert für Ubuntu (Plain-Partition) **und** Debian (LVM) — kein
+manuelles `growpart`/`resize2fs` mehr nötig. Abschalten im Klon:
+`touch /etc/growroot.disabled`.
 
 ---
 

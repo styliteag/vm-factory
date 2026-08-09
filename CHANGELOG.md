@@ -51,6 +51,23 @@ Versionierung nach [SemVer](https://semver.org/lang/de/).
 
 ### Behoben
 
+- **Auto-Resize der Root-Platte blieb im Klon wirkungslos:** `growroot.service`
+  war ein Einmal-Dienst mit Marker `/var/lib/growroot.done`; der Marker wurde
+  unbedingt gesetzt (auch wenn `growpart` nichts tat), und `|| true` verschluckte
+  echte Fehler. Damit verbrauchte bereits der erste Boot des Templates den Lauf —
+  jede später vergrößerte Platte blieb dauerhaft ungenutzt (Symptom: 64-GB-Disk,
+  7,5-GB-Root, GPT spannt die Platte nicht). Der Dienst läuft jetzt bei jedem Boot
+  und ist idempotent; Marker entfällt, `resize2fs` ist das einzige harte
+  Erfolgskriterium (Fehler lassen die Unit sichtbar fehlschlagen). Abschalten per
+  `touch /etc/growroot.disabled`. **Bereits ausgerollte VMs** brauchen einmalig
+  `rm -f /var/lib/growroot.done` + Reboot (oder `growpart /dev/sda 2 && resize2fs /dev/sda2`).
+- **SSH-Härtung war wirkungslos:** Die von autoinstall (`ssh: allow-pw`) zur
+  Laufzeit erzeugte `/etc/ssh/sshd_config.d/50-cloud-init.conf` überlebte das
+  `purge cloud-init` (paketfremde Datei) und setzte `PasswordAuthentication yes`.
+  Da sshd je Option den ersten Treffer nimmt und der Include alphabetisch sortiert,
+  gewann sie gegen `99-hardening.conf`. Datei wird jetzt entfernt, die Härtung
+  heißt `00-hardening.conf`, und `sshd -T` verifiziert am Ende des Builds, dass
+  `PasswordAuthentication no` effektiv gilt (sonst bricht der Build ab).
 - **SSH startete im Klon nicht:** Ohne Cloud-Init fehlte die Neuerzeugung der in
   `99-cleanup.sh` entfernten Host-Keys → `sshd` startete mangels Keys nicht. Neuer
   systemd-Oneshot `regenerate-ssh-host-keys.service` (`ssh-keygen -A`, vor `ssh.service`/

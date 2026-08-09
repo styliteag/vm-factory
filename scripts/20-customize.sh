@@ -86,6 +86,10 @@ echo "==> Cloud-Init vollstaendig entfernen"
 apt-get -y purge cloud-init >/dev/null 2>&1 || true
 apt-get -y autoremove --purge >/dev/null 2>&1 || true
 rm -rf /etc/cloud /var/lib/cloud
+# Zur Laufzeit erzeugt (autoinstall "ssh: allow-pw"), gehoert keinem Paket und
+# ueberlebt daher das purge. Enthaelt "PasswordAuthentication yes" und wuerde die
+# spaetere Haertung aushebeln (sshd: erster Treffer gewinnt, Include ist alphabetisch).
+rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
 
 echo "==> Netzwerk-Konfiguration fuer eth0 (DHCP, ersetzt Cloud-Init-Netz)"
 case "${ID:-debian}" in
@@ -101,23 +105,23 @@ network:
       dhcp6: false
       accept-ra: false
       dhcp-identifier: mac
-# --- Feste IP? dhcp4 auf false setzen und folgende Zeilen einkommentieren ---
-# --- (Werte anpassen; ausfuehrliches Rezept: /root/SETUP.md) ----------------
-#     dhcp4: false
-#     addresses: [10.0.0.10/24]
-#     routes:
-#       - to: default
-#         via: 10.0.0.1
-#     nameservers:
-#       addresses: [10.0.0.1, 1.1.1.1]
-# danach:  netplan apply
-#
-# --- Zweite NIC (eth1)? unter "ethernets:" (gleiche Einrueckung wie eth0) ---
-#     eth1:
-#       dhcp4: true
-#       # oder feste IP analog zu eth0 oben:
-#       # dhcp4: false
-#       # addresses: [10.0.1.10/24]
+#  --- Feste IP? dhcp4 auf false setzen und folgende Zeilen einkommentieren ---
+#  --- (Werte anpassen; ausfuehrliches Rezept: /root/SETUP.md) ----------------
+#      dhcp4: false
+#      addresses: [10.0.0.10/24]
+#      routes:
+#        - to: default
+#          via: 10.0.0.1
+#      nameservers:
+#        addresses: [10.0.0.1, 1.1.1.1]
+#  danach:  netplan apply
+# 
+#  --- Zweite NIC (eth1)? unter "ethernets:" (gleiche Einrueckung wie eth0) ---
+#      eth1:
+#        dhcp4: true
+#        # oder feste IP analog zu eth0 oben:
+#        # dhcp4: false
+#        # addresses: [10.0.1.10/24]
 EOF
     chmod 0600 /etc/netplan/00-eth0.yaml
     ;;
@@ -133,21 +137,21 @@ iface lo inet loopback
 allow-hotplug eth0
 iface eth0 inet dhcp
 
-# --- Feste IP? Die zwei eth0-Zeilen oben durch folgendes ersetzen ---
-# --- (Werte anpassen; ausfuehrliches Rezept: /root/SETUP.md) --------
-# auto eth0
-# iface eth0 inet static
-#     address 10.0.0.10/24
-#     gateway 10.0.0.1
-#     dns-nameservers 10.0.0.1 1.1.1.1
-# danach:  systemctl restart networking   (oder reboot)
+#--- Feste IP? Die zwei eth0-Zeilen oben durch folgendes ersetzen ---
+#--- (Werte anpassen; ausfuehrliches Rezept: /root/SETUP.md) --------
+#auto eth0
+#iface eth0 inet static
+#    address 10.0.0.10/24
+#    gateway 10.0.0.1
+#    dns-nameservers 10.0.0.1 1.1.1.1
+#danach:  systemctl restart networking   (oder reboot)
 #
-# --- Zweite NIC (eth1)? folgende Zeilen einkommentieren ---
-# allow-hotplug eth1
-# iface eth1 inet dhcp
-# # oder feste IP:
-# # iface eth1 inet static
-# #     address 10.0.1.10/24
+#--- Zweite NIC (eth1)? folgende Zeilen einkommentieren ---
+#allow-hotplug eth1
+#iface eth1 inet dhcp
+## oder feste IP:
+## iface eth1 inet static
+##     address 10.0.1.10/24
 EOF
     ;;
 esac
@@ -218,8 +222,14 @@ ACHTUNG: `mkfs` löscht die Platte. Erst mit `lsblk` das richtige Gerät prüfen
 Platte am Host vergrößern (Beispiel Proxmox):
     qm disk resize <VMID> scsi0 40G
 Dann die VM neu starten — die Root-Partition wächst beim Boot automatisch
-(`growroot.service`, einmalig). Kein manuelles `growpart`/`resize2fs` nötig.
+(`growroot.service`). Der Dienst läuft bei jedem Boot und ist idempotent; die
+Reihenfolge ist egal (vergrößern vor oder nach dem ersten Boot).
+Kein manuelles `growpart`/`resize2fs` nötig.
 Prüfen:  `df -h /`
+Ohne Reboot geht es auch online (ext4, schreibt die Partitionstabelle):
+    systemctl start growroot
+Automatik abschalten (z. B. wenn am Plattenende Platz frei bleiben soll):
+    touch /etc/growroot.disabled
 
 ## Sanity-Check nach dem Klonen
     hostnamectl                            # Hostname korrekt gesetzt?
@@ -240,35 +250,59 @@ cat >> /etc/fstab <<'EOF'
 # UUID=<UUID>  /data  ext4  defaults,nofail  0  2
 EOF
 
-echo "==> Auto-Resize der Root-Partition beim ersten Boot einrichten"
+echo "==> Auto-Resize der Root-Partition bei jedem Boot einrichten"
 cat > /usr/local/sbin/growroot.sh <<'EOF'
 #!/bin/sh
-# Vergroessert die Root-Partition/-FS einmalig auf die volle Plattengroesse.
+# Vergroessert Root-Partition/-Dateisystem auf die volle Plattengroesse.
+#
+# Laeuft bei JEDEM Boot und ist idempotent -- absichtlich kein einmaliger
+# Marker: sonst verbraucht schon der erste Boot des Templates den Lauf, und
+# eine spaeter vergroesserte Platte bleibt fuer immer ungenutzt.
+# Abschalten:  touch /etc/growroot.disabled
 set -eu
-[ -f /var/lib/growroot.done ] && exit 0
+
+# Vergroesserungs-Schritte duerfen "nichts zu tun" melden (growpart NOCHANGE,
+# lvextend "size matches existing") -- das ist der Normalfall ab dem 2. Boot.
+# 2>&1: growpart schreibt "NOCHANGE: ..." nach stderr -- ohne Umleitung stuende
+# im Journal nur der rc, und "nichts zu tun" waere nicht von "Fehler" trennbar.
+try() { "$@" 2>&1 || echo "growroot: $1 rc=$? (nichts zu tun oder Fehler)"; }
+
 ROOT_SRC=$(findmnt -no SOURCE /)
 if echo "$ROOT_SRC" | grep -q '/dev/mapper/'; then
   PV=$(pvs --noheadings -o pv_name 2>/dev/null | head -1 | tr -d ' ')
   DISK=$(lsblk -no pkname "$PV" | head -1)
   PART=$(echo "$PV" | grep -o '[0-9]*$')
-  growpart "/dev/$DISK" "$PART" || true
-  pvresize "$PV" || true
-  lvextend -l +100%FREE "$ROOT_SRC" || true
-  resize2fs "$ROOT_SRC" || true
+  try growpart "/dev/$DISK" "$PART"
+  try pvresize "$PV"
+  try lvextend -l +100%FREE "$ROOT_SRC"
 else
   DISK=$(lsblk -no pkname "$ROOT_SRC" | head -1)
   PART=$(echo "$ROOT_SRC" | grep -o '[0-9]*$')
-  growpart "/dev/$DISK" "$PART" || true
-  resize2fs "$ROOT_SRC" || true
+  try growpart "/dev/$DISK" "$PART"
 fi
-touch /var/lib/growroot.done
+
+# resize2fs liefert auch bei "Nothing to do!" den Exit-Code 0 -- ein echter
+# Fehler laesst die Unit fehlschlagen (sichtbar in `systemctl status growroot`).
+resize2fs "$ROOT_SRC"
+
+# Deckt das Dateisystem das Device wirklich ab? Ohne diese Pruefung bliebe ein
+# steckengebliebener Grow-Schritt (LVM: lvextend) unbemerkt, weil resize2fs auf
+# dem ungewachsenen Device trivial erfolgreich ist.
+FS_BYTES=$(dumpe2fs -h "$ROOT_SRC" 2>/dev/null | awk -F: '
+  /^Block count:/ { c = $2 } /^Block size:/ { s = $2 } END { printf "%.0f", c * s }')
+DEV_BYTES=$(blockdev --getsize64 "$ROOT_SRC")
+# 64 MiB Toleranz fuer ext4-Metadaten-/Ausrichtungs-Rundung
+if [ -n "$FS_BYTES" ] && [ "$((DEV_BYTES - FS_BYTES))" -gt 67108864 ]; then
+  echo "growroot: FS ${FS_BYTES}B < Device ${DEV_BYTES}B -- Grow unvollstaendig"
+  exit 1
+fi
 EOF
 chmod 0755 /usr/local/sbin/growroot.sh
 cat > /etc/systemd/system/growroot.service <<'EOF'
 [Unit]
-Description=Grow root filesystem to fill the disk (once)
+Description=Grow root filesystem to fill the disk
 After=local-fs.target
-ConditionPathExists=!/var/lib/growroot.done
+ConditionPathExists=!/etc/growroot.disabled
 
 [Service]
 Type=oneshot
@@ -343,7 +377,10 @@ fi
 if [ -n "$KEYS" ]; then
   printf '%s\n' "$KEYS" > /root/.ssh/authorized_keys
   chmod 0600 /root/.ssh/authorized_keys
-  cat > /etc/ssh/sshd_config.d/99-hardening.conf <<'EOF'
+  # 00-*: sshd nimmt den ERSTEN Treffer je Option, der Include ist alphabetisch
+  # sortiert -- die Haertung muss daher vor allen anderen Drop-ins stehen.
+  rm -f /etc/ssh/sshd_config.d/99-hardening.conf
+  cat > /etc/ssh/sshd_config.d/00-hardening.conf <<'EOF'
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PubkeyAuthentication yes
@@ -369,5 +406,17 @@ systemctl enable ssh.service >/dev/null 2>&1 || systemctl enable ssh >/dev/null 
 
 # Konfiguration testen (Tippfehler wuerden aussperren)
 sshd -t
+
+# Haertung wirklich wirksam? sshd -T zeigt die effektive Konfiguration inklusive
+# aller Drop-ins -- faengt ein Drop-in ab, das die Haertung ueberstimmt.
+# (Nur wenn Keys hinterlegt sind; ohne Keys bleibt Passwort-Login gewollt aktiv.)
+if [ -n "$KEYS" ]; then
+  if ! sshd -T | grep -qi '^passwordauthentication no'; then
+    echo "FEHLER: PasswordAuthentication ist trotz Haertung nicht 'no':"
+    sshd -T | grep -i 'passwordauthentication\|permitrootlogin'
+    exit 1
+  fi
+  echo "    sshd -T geprueft: PasswordAuthentication no wirksam."
+fi
 
 echo "==> 20-customize.sh fertig"
