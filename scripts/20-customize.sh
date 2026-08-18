@@ -411,9 +411,14 @@ sshd -t
 # aller Drop-ins -- faengt ein Drop-in ab, das die Haertung ueberstimmt.
 # (Nur wenn Keys hinterlegt sind; ohne Keys bleibt Passwort-Login gewollt aktiv.)
 if [ -n "$KEYS" ]; then
-  if ! sshd -T | grep -qi '^passwordauthentication no'; then
+  # Ausgabe erst einsammeln, dann pruefen: 'sshd -T | grep -q' ist unter
+  # 'set -o pipefail' unzuverlaessig -- grep -q beendet sich beim Treffer,
+  # sshd stirbt am SIGPIPE (Status 141) und die Pipeline gilt als
+  # fehlgeschlagen, obwohl der Treffer da war.
+  SSHD_EFFECTIVE="$(sshd -T)"
+  if ! printf '%s\n' "$SSHD_EFFECTIVE" | grep -qi '^passwordauthentication no'; then
     echo "FEHLER: PasswordAuthentication ist trotz Haertung nicht 'no':"
-    sshd -T | grep -i 'passwordauthentication\|permitrootlogin'
+    printf '%s\n' "$SSHD_EFFECTIVE" | grep -i 'passwordauthentication\|permitrootlogin'
     exit 1
   fi
   echo "    sshd -T geprueft: PasswordAuthentication no wirksam."

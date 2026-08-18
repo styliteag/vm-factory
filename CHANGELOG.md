@@ -51,6 +51,15 @@ Versionierung nach [SemVer](https://semver.org/lang/de/).
 
 ### Behoben
 
+- **Build brach an der SSH-Prüfung ab, obwohl die Härtung griff:** Die
+  Verifikation `sshd -T | grep -q '^passwordauthentication no'` lief unter
+  `set -o pipefail`. `grep -q` beendet sich beim Treffer (Zeile 31 von 103),
+  `sshd` stirbt beim Weiterschreiben am SIGPIPE (Status 141) — damit gilt die
+  Pipeline als fehlgeschlagen, obwohl der Treffer da war. Der Build stoppte mit
+  „FEHLER: PasswordAuthentication ist trotz Haertung nicht 'no'“, während die
+  Diagnosezeile direkt darunter `passwordauthentication no` ausgab. Race,
+  reproduziert mit 18 Fehlschlägen in 20 Läufen. `sshd -T` wird jetzt einmal in
+  eine Variable eingesammelt und daraus geprüft.
 - **Auto-Resize der Root-Platte blieb im Klon wirkungslos:** `growroot.service`
   war ein Einmal-Dienst mit Marker `/var/lib/growroot.done`; der Marker wurde
   unbedingt gesetzt (auch wenn `growpart` nichts tat), und `|| true` verschluckte
