@@ -153,11 +153,13 @@ brew install hashicorp/tap/packer
 
 Auf dem **Proxmox-Host** (einmalig). Beispiel mit dediziertem User + Rolle:
 
+**PVE 9.x** (`VM.Monitor` gibt es dort nicht mehr, siehe Hinweis unten):
+
 ```bash
 pveum role add Packer -privs "\
 VM.Allocate VM.Clone VM.Config.CDROM VM.Config.CPU VM.Config.Cloudinit \
 VM.Config.Disk VM.Config.HWType VM.Config.Memory VM.Config.Network \
-VM.Config.Options VM.Monitor VM.Audit VM.PowerMgmt \
+VM.Config.Options VM.Audit VM.PowerMgmt VM.Console VM.GuestAgent.Audit \
 Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit \
 Sys.Audit Sys.Console Sys.Modify SDN.Use"
 
@@ -168,10 +170,20 @@ pveum user token add packer@pve packer --privsep 0   # Token erbt User-Rechte
 # Oder einfach einen API-Token anlegen und alle Rechte vergeben in der Proxmox-UI.
 ```
 
+Auf **PVE 8.x** stattdessen `VM.Monitor` statt `VM.Console VM.GuestAgent.Audit`
+verwenden – die übrigen Privilegien sind identisch.
+
 Das ausgegebene **Token-Secret** notieren (wird nur einmal angezeigt).
 
-> `VM.Monitor` ist wichtig – ohne diese Berechtigung kann Packer die
-> `boot_command`-Tasten nicht an die VM senden.
+> **Wichtig:** Packer braucht Monitor-Zugriff, um die `boot_command`-Tasten zu
+> senden, **und** Guest-Agent-Zugriff, um nach der Installation die VM-IP zu
+> ermitteln. In PVE 8 deckte `VM.Monitor` beides ab; in **PVE 9** wurde es
+> aufgeteilt in `VM.Console` (Tasten/Monitor) und `VM.GuestAgent.Audit` (IP via
+> qemu-guest-agent). Fehlt eines davon, hängt der Build stumm am Boot-Prompt
+> bzw. beim Warten auf die IP.
+>
+> Die gültigen Privilegien der eigenen Version listet:
+> `pvesh get /access/roles/Administrator`
 
 ### 4. Zugangsdaten eintragen
 
