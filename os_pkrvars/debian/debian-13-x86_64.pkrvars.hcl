@@ -23,10 +23,21 @@ iso_checksum = "sha256:a7ef94ac2fb9a7fec454552abd629b7cc9d5155c886165a45649f5ce6
 # 'menuentry --hotkey=i Install' aus -> interaktiver Installer (Sprachauswahl),
 # Build laeuft in den SSH-Timeout. Ubuntus Menue hat keine Hotkeys, dort faellt
 # knappes Timing nicht auf.
+#
+# ipv6.disable=1 gilt NUR fuer den Installer-Kernel: Im Build-Netz werden
+# IPv6-Router-Advertisements verteilt, es gibt aber keinen funktionierenden
+# IPv6-Ausgang. deb.debian.org hat AAAA-Records -> der Installer laeuft in
+# Timeouts und meldet "Bad archive mirror", der Build haengt im Dialog bis zum
+# SSH-Timeout. Mit IPv4 laeuft der Mirror-Schritt normal durch.
+#
+# Absicht: nur der Installer, NICHT das Template -- ob IPv6 im Image an bleibt,
+# ist eine Policy-Entscheidung und soll nicht als Nebenwirkung hier fallen.
+# Ob d-i den Parameter in die GRUB-Config des Ziels uebernimmt, ist beim
+# Klon-Test zu pruefen (/etc/default/grub im Klon).
 boot_wait = "15s"
 boot_command = [
   "<wait5s>c<wait2s>",
-  "linux /install.amd/vmlinuz auto=true priority=critical preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/debian/preseed.cfg hostname=debian domain=local interface=auto vga=788 ---<enter><wait>",
+  "linux /install.amd/vmlinuz auto=true priority=critical preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/debian/preseed.cfg hostname=debian domain=local interface=auto ipv6.disable=1 vga=788 ---<enter><wait>",
   "initrd /install.amd/initrd.gz<enter><wait>",
   "boot<enter>"
 ]
@@ -36,7 +47,7 @@ boot_command = [
 vsphere_guest_os_type = "debian12_64Guest"
 vsphere_boot_command = [
   "<wait5s>c<wait2s>",
-  "linux /install.amd/vmlinuz auto=true priority=critical preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/debian/preseed.cfg hostname=debian domain=local interface=auto vga=788 ---<enter><wait>",
+  "linux /install.amd/vmlinuz auto=true priority=critical preseed/url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/debian/preseed.cfg hostname=debian domain=local interface=auto ipv6.disable=1 vga=788 ---<enter><wait>",
   "initrd /install.amd/initrd.gz<enter><wait>",
   "boot<enter>"
 ]
