@@ -3,15 +3,15 @@
 # 99 - Aufraeumen & Generalisieren
 #
 # Letzter Schritt vor der Template-Erstellung: Maschinen-spezifische Identitaet
-# entfernen, damit jeder Klon eindeutig ist und Cloud-Init frisch laeuft.
+# entfernen, damit jeder Klon eindeutig ist.
 ###############################################################################
 set -euo pipefail
-export DEBIAN_FRONTEND=noninteractive
+# shellcheck source=/dev/null
+. /tmp/packer-os-lib.sh
 
-echo "==> apt aufraeumen"
-apt-get -y autoremove --purge
-apt-get -y clean
-rm -rf /var/lib/apt/lists/*
+echo "==> Paketcache aufraeumen"
+os_pkg_autoremove
+os_pkg_clean
 
 echo "==> SSH-Host-Keys entfernen (werden beim ersten Boot neu erzeugt)"
 rm -f /etc/ssh/ssh_host_*
@@ -19,7 +19,12 @@ rm -f /etc/ssh/ssh_host_*
 echo "==> machine-id zuruecksetzen"
 truncate -s 0 /etc/machine-id
 rm -f /var/lib/dbus/machine-id
-ln -sf /etc/machine-id /var/lib/dbus/machine-id
+# Der dbus-Symlink existiert nur dort, wo es /var/lib/dbus ueberhaupt gibt
+# (Debian/Ubuntu). Auf RHEL 10 liest dbus direkt /etc/machine-id, das
+# Verzeichnis fehlt -- ein 'ln' dorthin bricht mit ENOENT ab.
+if [ -d /var/lib/dbus ]; then
+  ln -sf /etc/machine-id /var/lib/dbus/machine-id
+fi
 
 echo "==> Logs leeren"
 find /var/log -type f -exec truncate -s 0 {} \; 2>/dev/null || true

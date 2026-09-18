@@ -20,6 +20,14 @@ build {
     destination = "/tmp/packer-authorized_keys"
   }
 
+  # OS-Abstraktion (apt/dnf, netplan/NetworkManager, ...) -- die shell-Provisioner
+  # binden sie mit '. /tmp/packer-os-lib.sh' ein. Muss ein eigener file-Provisioner
+  # sein: 'scripts = [...]' laedt nur die dort gelisteten Dateien hoch.
+  provisioner "file" {
+    source      = "scripts/lib/os.sh"
+    destination = "/tmp/packer-os-lib.sh"
+  }
+
   provisioner "shell" {
     # 'sudo env {{ .Vars }}' reicht die environment_vars zuverlaessig an root weiter
     # (sudo -E wird von der Policy ignoriert).
