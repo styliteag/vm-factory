@@ -145,6 +145,12 @@ variable "template_tags" {
   description = "Proxmox-Tags fuer das Template (durch ';' getrennt)"
 }
 
+variable "task_timeout" {
+  type        = string
+  default     = "30m"
+  description = "Timeout fuer PVE-Tasks (v. a. der ISO-Download durch den Node). Der Plugin-Default von 1m reicht fuer grosse ISOs nicht; gemessen wurden auf px1 ~2,5 MB/s vom Rocky-Redirector (2 GB => ~13 min), waehrend derselbe Download vom Build-Host mit 45 MB/s lief. Grosszuegig setzen: ein hoher Wert bremst schnelle Tasks nicht, ein zu niedriger bricht einen laufenden Download ab."
+}
+
 variable "boot_wait" {
   type        = string
   default     = "5s"

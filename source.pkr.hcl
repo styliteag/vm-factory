@@ -79,6 +79,14 @@ source "proxmox-iso" "vm" {
   }
   qemu_agent = true # noetig, damit Packer die VM-IP nach dem Reboot findet
 
+  # ---- PVE-Task-Timeout ----
+  # Gilt u. a. fuer den ISO-Download durch den Node. Default des Plugins ist 1m;
+  # ein 3,8-GB-ISO (Ubuntu 24.04.5) braucht inkl. Checksummen-Pruefung laenger,
+  # der Build bricht dann ab, obwohl der PVE-Task sauber weiterlaeuft. Die
+  # Downloadrate haengt am Mirror/Edge, den der NODE erwischt -- sie kann um
+  # eine Groessenordnung unter der des Build-Hosts liegen.
+  task_timeout = var.task_timeout
+
   # ---- Automatische Installation ----
   boot_wait      = var.boot_wait
   boot_command   = var.boot_command
