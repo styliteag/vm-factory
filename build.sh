@@ -2,11 +2,11 @@
 ###############################################################################
 # Komfort-Wrapper um `packer build` / `packer validate`.
 #
-#   ./build.sh [proxmox|vsphere] {ubuntu-26.04|debian-13|all|validate} [args...]
+#   ./build.sh [proxmox|vsphere] {ubuntu-26.04|ubuntu-24.04|debian-13|debian-12|rocky-10|all|validate} [args...]
 #
 # Plattform ist optional (Default: proxmox). Beispiele:
-#   ./build.sh ubuntu-26.04          # Proxmox, Ubuntu
-#   ./build.sh proxmox all           # Proxmox, beide
+#   ./build.sh ubuntu-26.04          # Proxmox, Ubuntu 26.04
+#   ./build.sh proxmox all           # Proxmox, alle OS
 #   ./build.sh vsphere debian-13     # vSphere, Debian
 #   ./build.sh vsphere validate      # vSphere-Konfiguration pruefen
 #
@@ -16,10 +16,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 UBUNTU="os_pkrvars/ubuntu/ubuntu-26.04-x86_64.pkrvars.hcl"
+UBUNTU2404="os_pkrvars/ubuntu/ubuntu-24.04-x86_64.pkrvars.hcl"
 DEBIAN="os_pkrvars/debian/debian-13-x86_64.pkrvars.hcl"
+DEBIAN12="os_pkrvars/debian/debian-12-x86_64.pkrvars.hcl"
+ROCKY="os_pkrvars/rocky/rocky-10-x86_64.pkrvars.hcl"
 
 usage() {
-  echo "Usage: $0 [proxmox|vsphere] {ubuntu-26.04|debian-13|all|validate} [packer-args...]"
+  echo "Usage: $0 [proxmox|vsphere] {ubuntu-26.04|ubuntu-24.04|debian-13|debian-12|rocky-10|all|validate} [packer-args...]"
   exit 1
 }
 
@@ -62,13 +65,22 @@ run() {
 case "$TARGET" in
   validate)
     run "$UBUNTU" "Ubuntu 26.04"
+    run "$UBUNTU2404" "Ubuntu 24.04"
     run "$DEBIAN" "Debian 13"
+    run "$DEBIAN12" "Debian 12"
+    run "$ROCKY" "Rocky 10"
     ;;
   ubuntu-26.04) run "$UBUNTU" "Ubuntu 26.04" ;;
+  ubuntu-24.04) run "$UBUNTU2404" "Ubuntu 24.04" ;;
   debian-13) run "$DEBIAN" "Debian 13" ;;
+  debian-12) run "$DEBIAN12" "Debian 12" ;;
+  rocky-10) run "$ROCKY" "Rocky 10" ;;
   all)
     run "$UBUNTU" "Ubuntu 26.04"
+    run "$UBUNTU2404" "Ubuntu 24.04"
     run "$DEBIAN" "Debian 13"
+    run "$DEBIAN12" "Debian 12"
+    run "$ROCKY" "Rocky 10"
     ;;
   *) usage ;;
 esac
