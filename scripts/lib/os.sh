@@ -193,6 +193,34 @@ os_net_dhcp_eth0() {
   esac
 }
 
+# Variante -ci: cloud-init schreibt das Netz (ipconfig0 bzw. Fallback DHCP auf
+# eth0). Hier nur die Installer-Konfiguration entfernen, damit sie nicht mit
+# der von cloud-init konkurriert.
+os_net_cloudinit() {
+  case "${ID:-}" in
+    ubuntu)
+      rm -f /etc/netplan/00-installer-config.yaml /etc/netplan/50-cloud-init.yaml
+      ;;
+    debian)
+      # Installer-Eintrag haengt am alten Namen (ens18 o. ae., vor
+      # net.ifnames=0) -> auf lo reduzieren; cloud-init legt
+      # /etc/network/interfaces.d/50-cloud-init an.
+      mkdir -p /etc/network/interfaces.d
+      cat > /etc/network/interfaces <<'EOT'
+# Von Packer erzeugt (Variante -ci): Netzwerk kommt von cloud-init,
+# siehe /etc/network/interfaces.d/50-cloud-init (Proxmox: ipconfig0).
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+EOT
+      ;;
+    *)
+      echo "WARNUNG: cloud-init-Netz fuer ID=${ID:-?} nicht implementiert/getestet" >&2
+      ;;
+  esac
+}
+
 _os_net_netplan() {
   rm -f /etc/netplan/50-cloud-init.yaml /etc/netplan/00-installer-config.yaml
   cat > /etc/netplan/00-eth0.yaml <<'EOF'

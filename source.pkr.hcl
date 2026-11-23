@@ -7,8 +7,11 @@
 
 locals {
   # Proxmox verlangt gueltige DNS-Namen: '.' und '_' -> '-'
-  template_name = replace(replace("${var.os_name}-${var.os_version}-${var.os_arch}", ".", "-"), "_", "-")
-  vm_name       = replace(replace("packer-${var.os_name}-${var.os_version}", ".", "-"), "_", "-")
+  # cloud_init=true -> eigenes Template mit Suffix '-ci' (ueberschreibt das
+  # Golden Image ohne cloud-init nicht)
+  ci_suffix     = var.cloud_init ? "-ci" : ""
+  template_name = replace(replace("${var.os_name}-${var.os_version}-${var.os_arch}${local.ci_suffix}", ".", "-"), "_", "-")
+  vm_name       = replace(replace("packer-${var.os_name}-${var.os_version}${local.ci_suffix}", ".", "-"), "_", "-")
 }
 
 source "proxmox-iso" "vm" {
@@ -78,6 +81,12 @@ source "proxmox-iso" "vm" {
     type = "std"
   }
   qemu_agent = true # noetig, damit Packer die VM-IP nach dem Reboot findet
+
+  # ---- cloud-init-Laufwerk (nur bei cloud_init=true) ----
+  # Haengt nach der Template-Konvertierung ein cloudinit-Drive an; Klone
+  # bekommen Hostname/IP/Keys dann ueber ipconfig0, ciuser, sshkeys ...
+  cloud_init              = var.cloud_init
+  cloud_init_storage_pool = var.cloud_init ? var.vm_storage_pool : null
 
   # ---- PVE-Task-Timeout ----
   # Gilt u. a. fuer den ISO-Download durch den Node. Default des Plugins ist 1m;

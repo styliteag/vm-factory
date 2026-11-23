@@ -13,6 +13,12 @@ echo "==> Paketcache aufraeumen"
 os_pkg_autoremove
 os_pkg_clean
 
+if command -v cloud-init >/dev/null 2>&1; then
+  echo "==> cloud-init zuruecksetzen (laeuft im Klon wie beim ersten Boot)"
+  cloud-init clean --logs --seed || cloud-init clean --logs || true
+  rm -f /etc/netplan/50-cloud-init.yaml
+fi
+
 echo "==> SSH-Host-Keys entfernen (werden beim ersten Boot neu erzeugt)"
 rm -f /etc/ssh/ssh_host_*
 

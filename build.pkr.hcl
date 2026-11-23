@@ -39,6 +39,7 @@ build {
       "VM_KEYMAP=${var.vm_keymap}",
       "SSH_AUTHORIZED_KEYS=${var.ssh_authorized_keys}",
       "ROOT_PASSWORD=${var.root_password}",
+      "CLOUD_INIT=${var.cloud_init}",
     ]
     scripts = [
       "scripts/00-update.sh",

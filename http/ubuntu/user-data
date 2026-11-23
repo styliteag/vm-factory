@@ -9,6 +9,19 @@ autoinstall:
   refresh-installer:
     update: false
 
+  # Deutscher Mirror statt Geo-IP-Auswahl (archive.ubuntu.com war sehr langsam).
+  # Gilt fuer die Installation UND landet als apt-Quelle im Template.
+  # Auch -security vom DE-Mirror: schneller, dafuer Patches ggf. einige Stunden
+  # spaeter als auf security.ubuntu.com (Mirror-Sync) -- bewusst so entschieden.
+  apt:
+    geoip: false
+    primary:
+      - arches: [default]
+        uri: http://de.archive.ubuntu.com/ubuntu
+    security:
+      - arches: [default]
+        uri: http://de.archive.ubuntu.com/ubuntu
+
   # Einzelne grosse Root-Partition -> laesst sich beim Klonen leicht vergroessern
   storage:
     layout:

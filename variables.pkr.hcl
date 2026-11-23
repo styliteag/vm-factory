@@ -145,6 +145,12 @@ variable "template_tags" {
   description = "Proxmox-Tags fuer das Template (durch ';' getrennt)"
 }
 
+variable "cloud_init" {
+  type        = bool
+  default     = false
+  description = "true = cloud-init im Template behalten (Proxmox: plus cloud-init-Laufwerk), damit Hostname/feste IP/SSH-Keys beim Klonen per ipconfig0 & Co. gesetzt werden. Template-Name bekommt dann das Suffix '-ci'. Default false = Golden Image ohne cloud-init."
+}
+
 variable "task_timeout" {
   type        = string
   default     = "30m"

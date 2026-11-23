@@ -19,6 +19,7 @@ set -euo pipefail
 : "${VM_KEYMAP:=de}"
 : "${SSH_AUTHORIZED_KEYS:=}"
 : "${ROOT_PASSWORD:=}"
+: "${CLOUD_INIT:=false}"   # true -> cloud-init behalten (Template-Variante -ci)
 
 # shellcheck source=/dev/null
 . /tmp/packer-os-lib.sh   # setzt OS_FAMILY, ID, DEBIAN_FRONTEND
@@ -67,19 +68,46 @@ EOF
 echo "==> Interface-Benennung auf eth0 (net.ifnames=0 biosdevname=0)"
 os_kernel_cmdline_add "net.ifnames=0 biosdevname=0"
 
-echo "==> Cloud-Init vollstaendig entfernen"
-os_pkg_remove cloud-init
-os_pkg_autoremove
-rm -rf /etc/cloud /var/lib/cloud
 # Zur Laufzeit erzeugt (autoinstall "ssh: allow-pw"), gehoert keinem Paket und
 # ueberlebt daher das purge. Enthaelt "PasswordAuthentication yes" und wuerde die
 # spaetere Haertung aushebeln (sshd: erster Treffer gewinnt, Include ist alphabetisch).
 rm -f /etc/ssh/sshd_config.d/50-cloud-init.conf
 
-echo "==> Netzwerk-Konfiguration fuer eth0 (DHCP, ersetzt Cloud-Init-Netz)"
-# netplan (Ubuntu) / ifupdown (Debian) / NetworkManager-Keyfile (RHEL) --
-# inkl. auskommentierter Vorlage fuer feste IP; siehe scripts/lib/os.sh.
-os_net_dhcp_eth0
+if [ "${CLOUD_INIT}" = "true" ]; then
+  echo "==> Cloud-Init BEHALTEN und fuer Proxmox (NoCloud/ConfigDrive) konfigurieren"
+  os_pkg_install cloud-init >/dev/null
+  mkdir -p /etc/cloud/cloud.cfg.d
+  # Reste des Installers entfernen: 99-installer.cfg zeigt auf den
+  # Packer-HTTP-Server als Datasource, subiquity-disable-cloudinit-networking
+  # wuerde verhindern, dass cloud-init die Netzwerk-Konfig (ipconfig0) schreibt.
+  rm -f /etc/cloud/cloud.cfg.d/99-installer.cfg \
+    /etc/cloud/cloud.cfg.d/90-installer-network.cfg \
+    /etc/cloud/cloud.cfg.d/subiquity-disable-cloudinit-networking.cfg \
+    /etc/cloud/ds-identify.cfg
+  cat > /etc/cloud/cloud.cfg.d/99-vm-factory.cfg <<'EOF'
+# vm-factory: Template-Variante MIT cloud-init (Suffix -ci)
+# Proxmox liefert die Daten per NoCloud-Laufwerk (ide2: cloudinit).
+datasource_list: [NoCloud, ConfigDrive, None]
+# root-Login per Key erlauben (Default bei Ubuntu waere "disable_root: true",
+# das wuerde die root-Keys durch einen "bitte als ubuntu anmelden"-Hinweis ersetzen)
+disable_root: false
+ssh_pwauth: false
+EOF
+  # Netz macht cloud-init: Installer-Netzkonfig entfernen (netplan bzw.
+  # /etc/network/interfaces). Ohne cloud-init-Laufwerk (Datasource None) faellt
+  # cloud-init auf DHCP fuer die erste NIC (eth0) zurueck.
+  os_net_cloudinit
+else
+  echo "==> Cloud-Init vollstaendig entfernen"
+  os_pkg_remove cloud-init
+  os_pkg_autoremove
+  rm -rf /etc/cloud /var/lib/cloud
+
+  echo "==> Netzwerk-Konfiguration fuer eth0 (DHCP, ersetzt Cloud-Init-Netz)"
+  # netplan (Ubuntu) / ifupdown (Debian) / NetworkManager-Keyfile (RHEL) --
+  # inkl. auskommentierter Vorlage fuer feste IP; siehe scripts/lib/os.sh.
+  os_net_dhcp_eth0
+fi
 
 echo "==> Erstkonfigurations-Hilfen ablegen (passiv, nichts laeuft automatisch)"
 # Zentrale Anleitung fuer den Installer/Operator nach dem Klonen.
@@ -173,6 +201,18 @@ Automatik abschalten (z. B. wenn am Plattenende Platz frei bleiben soll):
     systemctl is-active qemu-guest-agent   # bzw. open-vm-tools (vSphere)
     df -h /                                # Root auf voller Plattengröße?
 EOF
+if [ "${CLOUD_INIT}" = "true" ]; then
+  # Hinweis voranstellen: in der -ci-Variante setzt cloud-init Hostname/IP
+  {
+    head -n 1 /root/SETUP.md
+    echo
+    echo "> **Variante -ci:** Dieses Template enthaelt cloud-init. Hostname, feste IP"
+    echo "> und SSH-Keys kommen beim Klonen aus dem Proxmox-cloud-init-Laufwerk"
+    echo "> (ipconfig0, nameserver, sshkeys). Die Rezepte unten sind nur der Notfallweg."
+    tail -n +2 /root/SETUP.md
+  } > /root/SETUP.md.new
+  mv /root/SETUP.md.new /root/SETUP.md
+fi
 chmod 0644 /root/SETUP.md
 
 # Kurz-Stub direkt in der fstab (passiv, auskommentiert).
