@@ -65,6 +65,21 @@ eth0 IPv4: \4{eth0}
 
 EOF
 
+echo "==> Installer-Bootparameter aus /etc/default/grub entfernen"
+# Subiquity (u. a. 26.04) uebernimmt die Parameter aus dem boot_command in
+# GRUB_CMDLINE_LINUX_DEFAULT, z. B. 'autoinstall ds=nocloud-net;s=http://<packer>/'.
+# cloud-init wertet ds= aus (seed=cmdline) und wuerde im Klon den laengst
+# beendeten Packer-HTTP-Server als Datasource ansprechen.
+if [ -f /etc/default/grub ]; then
+  sed -i -E '/^GRUB_CMDLINE_LINUX(_DEFAULT)?=/{
+    s/(["[:space:]])autoinstall([[:space:]]|")/\1\2/g
+    s/(["[:space:]])ds=[^"[:space:]]*/\1/g
+    s/  +/ /g
+    s/=" /="/
+    s/ "$/"/
+  }' /etc/default/grub
+fi
+
 echo "==> Interface-Benennung auf eth0 (net.ifnames=0 biosdevname=0)"
 os_kernel_cmdline_add "net.ifnames=0 biosdevname=0"
 
