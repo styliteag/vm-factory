@@ -224,6 +224,11 @@ if [ "${CLOUD_INIT}" = "true" ]; then
     echo "> **Variante -ci:** Dieses Template enthaelt cloud-init. Hostname, feste IP"
     echo "> und SSH-Keys kommen beim Klonen aus dem Proxmox-cloud-init-Laufwerk"
     echo "> (ipconfig0, nameserver, sshkeys). Die Rezepte unten sind nur der Notfallweg."
+    echo ">"
+    echo "> Achtung: cloud-init schreibt /etc/hosts bei JEDEM Boot neu (127.0.1.1 <fqdn>)."
+    echo "> Eigene Eintraege in /etc/cloud/templates/hosts.debian.tmpl pflegen."
+    echo "> Beim Aendern von net0 die bisherige MAC mitgeben (virtio=<MAC>,bridge=...),"
+    echo "> sonst greift die Netzkonfiguration (Match auf MAC) erst nach einem Reboot."
     tail -n +2 /root/SETUP.md
   } > /root/SETUP.md.new
   mv /root/SETUP.md.new /root/SETUP.md

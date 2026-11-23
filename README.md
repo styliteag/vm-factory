@@ -1,7 +1,8 @@
 # vm-factory
 
 > **TL;DR** – Mit [Packer](https://developer.hashicorp.com/packer) gebaute **VM-Templates ("Golden Images")**
-> für **Ubuntu 26.04** & **Debian 13** auf **Proxmox** und **VMware vSphere** – **ohne Cloud-Init**.
+> für **Ubuntu 26.04** & **Debian 13** auf **Proxmox** und **VMware vSphere** – **ohne Cloud-Init**
+> (Proxmox zusätzlich als Variante **mit** cloud-init, Suffix `-ci`).
 > Vollautomatische Installation (autoinstall/preseed), Gast-Tools (`qemu-guest-agent`/`open-vm-tools`)
 > und **root-SSH-Key** sind fertig eingebacken. Ergebnis: klonen → starten → per DHCP auf `eth0`
 > direkt als `root` per SSH erreichbar; Hostname/IP danach nach Bedarf (z. B. Ansible).
@@ -199,8 +200,19 @@ per `.gitignore` vom Versionsmanagement ausgenommen.
 
 ## Nutzung
 
-Aufruf: `./build.sh [proxmox|vsphere] {ubuntu-26.04|debian-13|all|validate}`
+Aufruf: `./build.sh [proxmox|vsphere] {ubuntu-26.04|ubuntu-24.04|ubuntu-22.04|debian-13|debian-12|rocky-10|all|validate}`
 (Plattform optional, Default `proxmox`).
+
+Ubuntu und Debian werden standardmäßig in **zwei Varianten** gebaut bzw. geprüft:
+`<os>-<version>-x86-64` (ohne cloud-init) und `<os>-<version>-x86-64-ci`
+(mit cloud-init + Proxmox-cloudinit-Laufwerk). Einschränken per `VARIANTS`:
+
+```bash
+VARIANTS=ci    ./build.sh ubuntu-22.04   # nur die -ci-Variante
+VARIANTS=plain ./build.sh all            # nur ohne cloud-init
+```
+
+Rocky wird nur ohne cloud-init gebaut.
 
 ```bash
 # Proxmox (Default)
@@ -241,6 +253,43 @@ Ansible). Im Klon liegt `/root/SETUP.md` mit fertigen Rezepten (Hostname, feste
 IP für netplan/ifupdown, zweite Platte); die MOTD verweist beim Login darauf.
 Auskommentierte Kurzvorlagen stehen zusätzlich direkt in `00-eth0.yaml` /
 `/etc/network/interfaces` und `/etc/fstab`.
+
+### Variante mit cloud-init (`-ci`)
+
+Die `-ci`-Templates haben ein cloudinit-Laufwerk; Hostname (= VM-Name), Netz,
+Nameserver und SSH-Keys kommen beim ersten Boot aus Proxmox:
+
+```bash
+qm clone <TEMPLATE_VMID> 9001 --name web01 --full
+qm set 9001 --ciuser root --sshkeys ~/.ssh/id_ed25519.pub \
+  --ipconfig0 ip=10.0.0.10/24,gw=10.0.0.1 \
+  --nameserver 10.0.0.1 --searchdomain example.com
+qm start 9001
+```
+
+Ohne `ipconfig0` fällt cloud-init auf DHCP für `eth0` zurück. Die im Template
+eingebackenen Team-Keys bleiben zusätzlich gültig. Prüfen im Klon:
+`cloud-init status --long` (`degraded done` mit einer Deprecation-Warnung zu
+`'user' of type string` stammt aus der von Proxmox erzeugten user-data und ist
+harmlos).
+
+**Fallen:**
+
+- **`/etc/hosts` wird bei jedem Boot neu geschrieben.** Die Proxmox-user-data
+  setzt `manage_etc_hosts: true`; cloud-init schreibt dann
+  `127.0.1.1 <fqdn> <host>`. Dienste, die den eigenen FQDN aufrufen (z. B. ein
+  Docker-Container gegen eine API auf demselben Host), laufen damit in
+  „Connection refused". Ein Override in `/etc/cloud/cloud.cfg.d/` hilft nicht
+  (user-data gewinnt). Stattdessen das Template anpassen, aus dem cloud-init
+  die Datei erzeugt — `/etc/cloud/templates/hosts.debian.tmpl` (gilt auch für
+  Ubuntu), erste Zeile `## template:jinja`, darin z. B.
+  `<ip> {{fqdn}} {{hostname}}`.
+- **MAC beim Ändern von `net0` mitgeben.** `qm set … --net0 virtio,bridge=…`
+  ohne MAC erzeugt eine neue MAC. Die cloud-init-Netzkonfiguration matcht auf
+  die MAC → die VM ist bis zum nächsten Boot offline (dann schreibt cloud-init
+  die Konfiguration neu). Daher: `--net0 virtio=<MAC>,bridge=…`.
+
+### Platte vergrößern
 
 Platte vergrößern: `qm disk resize 9001 scsi0 40G` und neu starten. Die
 Root-Partition wächst beim Boot automatisch auf die volle Plattengröße
