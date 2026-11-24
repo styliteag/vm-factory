@@ -227,8 +227,9 @@ if [ "${CLOUD_INIT}" = "true" ]; then
     echo ">"
     echo "> Achtung: cloud-init schreibt /etc/hosts bei JEDEM Boot neu (127.0.1.1 <fqdn>)."
     echo "> Eigene Eintraege in /etc/cloud/templates/hosts.debian.tmpl pflegen."
-    echo "> Beim Aendern von net0 die bisherige MAC mitgeben (virtio=<MAC>,bridge=...),"
+    echo "> Beim Aendern von net0 die bisherige MAC mitgeben (virtio=<MAC>,bridge=...,tag=<vlan>),"
     echo "> sonst greift die Netzkonfiguration (Match auf MAC) erst nach einem Reboot."
+    echo "> Auf einer VLAN-aware Bridge den tag nie weglassen (sonst Trunk ueber alle VLANs)."
     tail -n +2 /root/SETUP.md
   } > /root/SETUP.md.new
   mv /root/SETUP.md.new /root/SETUP.md

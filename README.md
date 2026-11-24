@@ -287,7 +287,9 @@ harmlos).
 - **MAC beim Ändern von `net0` mitgeben.** `qm set … --net0 virtio,bridge=…`
   ohne MAC erzeugt eine neue MAC. Die cloud-init-Netzkonfiguration matcht auf
   die MAC → die VM ist bis zum nächsten Boot offline (dann schreibt cloud-init
-  die Konfiguration neu). Daher: `--net0 virtio=<MAC>,bridge=…`.
+  die Konfiguration neu). Daher: `--net0 virtio=<MAC>,bridge=…,tag=<vlan>`.
+  Auf einer VLAN-aware Bridge den `tag` nie weglassen — ohne Tag wird die NIC
+  zum Trunk über alle VLANs.
 
 ### Platte vergrößern
 
